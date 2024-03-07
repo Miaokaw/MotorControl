@@ -7,7 +7,7 @@
  */
 #include "DMASerial.h"
 
-ServoData servoData;
+ServoData servoData = {0};
 
 /**
  * @brief 数据初始化

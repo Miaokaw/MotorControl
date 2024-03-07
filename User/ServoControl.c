@@ -58,7 +58,6 @@ void runServosAction(void)
  */
 void runServosActionGroup(uint8_t actionGroupNum, uint8_t runTimes)
 {
-    uint8_t num = 2;
     servoData.rxFlag = 0;
     servoTxBuf[0] = servoTxBuf[1] = FRAME_HEAD;
     servoTxBuf[2] = 0x05;

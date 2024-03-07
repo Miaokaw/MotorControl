@@ -95,7 +95,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     hdma_usart1_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_usart1_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
     hdma_usart1_rx.Init.Mode = DMA_NORMAL;
-    hdma_usart1_rx.Init.Priority = DMA_PRIORITY_MEDIUM;
+    hdma_usart1_rx.Init.Priority = DMA_PRIORITY_LOW;
     if (HAL_DMA_Init(&hdma_usart1_rx) != HAL_OK)
     {
       Error_Handler();
@@ -104,7 +104,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     __HAL_LINKDMA(uartHandle,hdmarx,hdma_usart1_rx);
 
     /* USART1 interrupt Init */
-    HAL_NVIC_SetPriority(USART1_IRQn, 3, 0);
+    HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(USART1_IRQn);
   /* USER CODE BEGIN USART1_MspInit 1 */
 
@@ -141,7 +141,6 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 }
 
 /* USER CODE BEGIN 1 */
-/* 加入以下代码, 支持printf函数, 而不�????要�?�择use MicroLIB */
 
 #if 1
 #if (__ARMCC_VERSION >= 6010050)           /* 使用AC6编译器时 */
@@ -149,7 +148,7 @@ __asm(".global __use_no_semihosting\n\t"); /* 声明不使用半主机模式 */
 __asm(".global __ARM_use_no_argv \n\t");   /* AC6下需要声明main函数为无参数格式，否则部分例程可能出现半主机模式 */
 
 #else
-/* 使用AC5编译器时, 要在这里定义__FILE �???? 不使用半主机模式 */
+/* 使用AC5编译器时, 要在这里定义__FILE �????? 不使用半主机模式 */
 #pragma import(__use_no_semihosting)
 
 struct __FILE
@@ -180,15 +179,15 @@ char *_sys_command_string(char *cmd, int len)
   return NULL;
 }
 
-/* FILE �??? stdio.h里面定义. */
+/* FILE �???? stdio.h里面定义. */
 FILE __stdout;
 
 /* 重定义fputc函数, printf函数终会通过调用fputc输出字符串到串口 */
 int fputc(int ch, FILE *f)
 {
   while ((USART1->SR & 0X40) == 0)
-    ;                       /* 等待上一个字符发送完�???? */
-  USART1->DR = (uint8_t)ch; /* 将要发�?�的字符 ch 写入到DR寄存�??? */
+    ;                       /* 等待上一个字符发送完�????? */
+  USART1->DR = (uint8_t)ch; /* 将要发�?�的字符 ch 写入到DR寄存�???? */
   return ch;
 }
 #endif

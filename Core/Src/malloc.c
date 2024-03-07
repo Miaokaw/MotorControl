@@ -1,7 +1,16 @@
 #include "malloc.h"
 
-static __align(64) uint8_t pool[MAX_SIZE]; /* 内存池 */
-static uint16_t map[BLOCK_NUM];            /* 内存管理表 */
+static __align(32) uint8_t sramInPool[SRAMIN_MAX_SIZE]; /* 内存池 */
+uint16_t sramInMap[SRAMIN_BLOCK_NUM];            /* 内存管理表 */
+
+static __align(32) uint8_t sramOutPool[SRAMOUT_MAX_SIZE] __attribute__((at(0X68000000)));
+uint16_t sramOutMap[SRAMOUT_BLOCK_NUM] __attribute__((at(0X68000000 + SRAMOUT_MAX_SIZE)));
+
+SRAM sram = {sramInPool, sramOutPool, sramInMap, sramOutMap};
+
+const uint32_t BLOCK_SIZE[2] = {SRAMIN_BLOCK_SIZE, SRAMOUT_BLOCK_SIZE};
+const uint32_t BLOCK_NUM[2] = {SRAMIN_BLOCK_NUM, SRAMOUT_BLOCK_NUM};
+const uint32_t MAX_SIZE[2] = {SRAMIN_MAX_SIZE, SRAMOUT_MAX_SIZE};
 
 /**
  * @brief 将指定的字符c复制len次到ptr指向的内存中
@@ -10,7 +19,7 @@ static uint16_t map[BLOCK_NUM];            /* 内存管理表 */
  * @param c 要复制的字符
  * @param len 要复制的次数
  */
-void mymemset(void *ptr, int c, int len)
+void mymemset(void *ptr, uint8_t c, uint32_t len)
 {
     uint8_t *p = ptr;
 
@@ -23,7 +32,8 @@ void mymemset(void *ptr, int c, int len)
  */
 void mallocInit(void)
 {
-    mymemset(map, 0, BLOCK_NUM * sizeof(uint16_t));
+    mymemset(sram.map[IN], 0, BLOCK_NUM[IN] * 2);
+    mymemset(sram.map[OUT], 0, BLOCK_NUM[OUT] * 2);
 }
 
 /**
@@ -31,21 +41,21 @@ void mallocInit(void)
  * @param size 内存空间的大小
  * @return void* 分配的内存空间的指针，如果分配失败则返回NULL
  */
-void *mymalloc(uint16_t size)
+void *mymalloc(typeSRAM type, uint16_t size)
 {
-    long offset = 0;                         /* 记录待分配的内存块的偏移量 */
-    uint32_t freeBlocks = 0;                 /* 记录可用的连续内存块的数量 */
-    uint32_t needblocks = size / BlOCK_SIZE; /* 计算需要的连续内存块的数量 */
+    long offset = 0;                               /* 记录待分配的内存块的偏移量 */
+    uint32_t freeBlocks = 0;                       /* 记录可用的连续内存块的数量 */
+    uint32_t needblocks = size / BLOCK_SIZE[type]; /* 计算需要的连续内存块的数量 */
 
     if (size == 0)   /* 如果需要的连续内存块的数量为0，不需要进行分配 */
         return NULL; /* 返回NULL */
 
-    if (size % BlOCK_SIZE) /* 如果需要的内存块大小不是BlOCK_SIZE的整数倍 */
-        needblocks++;      /* 需要的连续内存块的数量加1 */
+    if (size % BLOCK_SIZE[type]) /* 如果需要的内存块大小不是BlOCK_SIZE的整数倍 */
+        needblocks++;            /* 需要的连续内存块的数量加1 */
 
-    for (offset = BLOCK_NUM - 1; offset >= 0; offset--) /* 从内存块的最后一个位置开始遍历 */
+    for (offset = BLOCK_NUM[type] - 1; offset >= 0; offset--) /* 从内存块的最后一个位置开始遍历 */
     {
-        if (map[offset] != 0) /* 如果当前内存块已经被占用 */
+        if (sram.map[type][offset] != 0) /* 如果当前内存块已经被占用 */
         {
             freeBlocks = 0; /* 重置可用的连续内存块的数量 */
             continue;
@@ -56,9 +66,9 @@ void *mymalloc(uint16_t size)
         {
             for (uint32_t i = 0; i < needblocks; i++) /* 将当前连续内存块标记为已占用 */
             {
-                map[offset + i] = needblocks;
+                sram.map[type][offset + i] = needblocks;
             }
-            return (void *)((uint32_t)pool + offset * BlOCK_SIZE); /* 返回分配的内存空间的指针 */
+            return (void *)((uint32_t)sram.pool[type] + offset * BLOCK_SIZE[type]); /* 返回分配的内存空间的指针 */
         }
     }
     return NULL;
@@ -69,18 +79,18 @@ void *mymalloc(uint16_t size)
  * @param ptr 要释放的内存块指针
  * @return 无
  */
-void myfree(void *ptr)
+void myfree(typeSRAM type, void *ptr)
 {
-    uint32_t offset = (uint32_t)ptr - (uint32_t)pool; /* 计算内存块在内存池中的偏移量 */
-    if (ptr == NULL)                                  /* 如果指针为空，则直接返回 */
+    uint32_t offset = (uint32_t)ptr - (uint32_t)sram.pool[type]; /* 计算内存块在内存池中的偏移量 */
+    if (ptr == NULL)                                             /* 如果指针为空，则直接返回 */
         return;
-    if (offset >= MAX_SIZE) /* 如果偏移量超出内存块数量，则直接返回 */
+    if (offset >= MAX_SIZE[type]) /* 如果偏移量超出内存块数量，则直接返回 */
         return;
-    int tmp = offset / BlOCK_SIZE;
-    int maxTmp = map[tmp];
+    int tmp = offset / BLOCK_SIZE[type];
+    int maxTmp = sram.map[type][tmp];
     for (int i = 0; i < maxTmp; i++) /* 遍历内存块中的所有元素 */
     {
-        map[tmp + i] = 0; /* 设置为未占用状态 */
+        sram.map[type][tmp + i] = 0; /* 设置为未占用状态 */
     }
 }
 
@@ -89,14 +99,14 @@ void myfree(void *ptr)
  *
  * @return uint16_t 内存使用率，范围[0,100] %
  */
-uint16_t getMemoryUsage(void)
+uint16_t getMemoryUsage(typeSRAM type)
 {
     uint32_t usedBlocks = 0; /* 记录已使用的连续内存块的数量 */
 
-    for (uint32_t i = 0; i < BLOCK_NUM; i++) /* 遍历内存管理 */
+    for (uint32_t i = 0; i < BLOCK_NUM[type]; i++) /* 遍历内存管理 */
     {
-        if (map[i] != 0)  /* 如果当前内存块已经被占用 */
-            usedBlocks++; /* 已使用的连续内存块的数量加1 */
+        if (sram.map[type][i] != 0) /* 如果当前内存块已经被占用 */
+            usedBlocks++;           /* 已使用的连续内存块的数量加1 */
     }
-    return (usedBlocks * 100) / (BLOCK_NUM); /* 内存使用率 */
+    return (usedBlocks * 100) / (BLOCK_NUM[type]); /* 内存使用率 */
 }

@@ -64,12 +64,16 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define PSC 18 - 1
 #define ARR 0xFFFF - 1
+#define KEY2_Pin GPIO_PIN_2
+#define KEY2_GPIO_Port GPIOE
 #define KEY1_Pin GPIO_PIN_3
 #define KEY1_GPIO_Port GPIOE
 #define KEY0_Pin GPIO_PIN_4
 #define KEY0_GPIO_Port GPIOE
 #define LED1_Pin GPIO_PIN_5
 #define LED1_GPIO_Port GPIOE
+#define KEY3_Pin GPIO_PIN_6
+#define KEY3_GPIO_Port GPIOE
 #define KEY_UP_Pin GPIO_PIN_0
 #define KEY_UP_GPIO_Port GPIOA
 #define LED0_Pin GPIO_PIN_5

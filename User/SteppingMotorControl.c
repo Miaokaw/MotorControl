@@ -24,7 +24,7 @@ void motorInit(void)
     motor2.motor = MOTOR2;
     motor3.motor = MOTOR3;
     motor4.motor = MOTOR4;
-    motor1.maxPos = 10000;
+    motor1.maxPos = 10000; /* 细分系数 = 8 爪子 = 10000， 较短丝杆 = ？， 较长丝杆 = ？ */
     motor2.maxPos = 10000;
     motor3.maxPos = 10000;
     motor4.maxPos = 10000;
@@ -48,7 +48,7 @@ void motorTIMUpgrade(MotorControl *motor)
     case MOTOR2:
         timCount = __HAL_TIM_GET_COUNTER(&htim1);
         tmp = 0xFFFF & (timCount + motor->pulse);
-        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, tmp);
+        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, tmp);
         break;
     default:
         break;
@@ -73,9 +73,9 @@ void motorTIMStar(MotorControl *motor)
     case MOTOR2:
         /* 重置计数器和比较器的值 */
         __HAL_TIM_SET_COUNTER(&htim1, 0);
-        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, (uint16_t)motor->pulse / 2);
+        __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, (uint16_t)motor->pulse / 2);
         /* 启动计时器的输出比较器 */
-        HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_3);
+        HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
         break;
     default:
         break;
@@ -94,7 +94,7 @@ void motorTIMStop(MotorControl *motor)
         HAL_TIM_OC_Stop_IT(&htim8, TIM_CHANNEL_1);
         break;
     case MOTOR2:
-        HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_3);
+        HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_1);
         break;
     default:
         break;
@@ -155,8 +155,8 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
     int32_t jerkDecStep = (int32_t)((v1 + v0) * t - jerkAccStep);   /* 减速度阶段的时间步 */
     int32_t step = jerkAccStep + jerkDecStep;                       /* 总时间步数 */
     if (step % 2 != 0)
-        step++;                                               /* 如果步数为奇数，则加1(（int32_t）转换时出现的误差) */
-    perTab = (float *)(mymalloc((step + 1) * sizeof(float))); /* 分配内存空间 */
+        step++;                                                    /* 如果步数为奇数，则加1(（int32_t）转换时出现的误差) */
+    perTab = (float *)(mymalloc(OUT, (step + 1) * sizeof(float))); /* 分配内存空间 */
     if (perTab == NULL)
         return 1; // 内存分配失败，返回0
 
@@ -216,17 +216,16 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
  * @param step 步进数
  * @return uint8_t 返回操作结果，0表示成功，1表示内存不够，2表示步数不够
  */
-uint8_t motorMove(MotorControl *motor, int32_t v0, int32_t v1, float AccTime, float DecTime, int32_t step)
+ uint8_t motorMove(MotorControl *motor, int32_t v0, int32_t v1, float AccTime, float DecTime, int32_t step)
 {
     /* 加速表计算 */
     if (perTabCal(motor, AccTime, v0, v1) == 1)
         return 1;
-    printf("malloc ACC %d\r\n", getMemoryUsage());
-
+    printf("motor%d malloc ACC %d\r\n", motor->motor, getMemoryUsage(OUT));
     /* 减速表计算 */
     if (perTabCal(motor, DecTime, v1, v0) == 1)
         return 1;
-    printf("malloc DEC  %d\r\n", getMemoryUsage());
+    printf("motor%d malloc DEC  %d\r\n", motor->motor, getMemoryUsage(OUT));
 
     /* 控制电机的正反转 */
     if (step > 0)
@@ -241,8 +240,8 @@ uint8_t motorMove(MotorControl *motor, int32_t v0, int32_t v1, float AccTime, fl
     /* 检查步进数是否满足要求 */
     if (step < (motor->accStep + motor->decStep))
     {
-        myfree(motor->accTab);
-        myfree(motor->decTab);
+        myfree(OUT, motor->accTab);
+        myfree(OUT, motor->decTab);
         return 2;
     }
 
@@ -269,6 +268,10 @@ uint8_t motorMove(MotorControl *motor, int32_t v0, int32_t v1, float AccTime, fl
  */
 void motorPosProtect(MotorControl *motor)
 {
+    if (motor->dir == FORWARD)
+        motor->actPos++;
+    else
+        motor->actPos--;
     if (motor->actPos >= 0 && motor->actPos <= motor->maxPos)
         return;
     if (motor->actPos < 0)
@@ -284,8 +287,8 @@ void motorPosProtect(MotorControl *motor)
         motorTIMStop(motor);
     }
     errorBeep = 1;
-    myfree(motor->accTab);
-    myfree(motor->decTab);
+    myfree(OUT, motor->accTab);
+    myfree(OUT, motor->decTab);
 }
 
 /**
@@ -303,40 +306,32 @@ void motorStateUpgrade(MotorControl *motor)
         /* 清零定时器中断次数计数值 */
         if ((motor->state != IDLE) && (motor->state != STOP)) /* 如果不是空闲状态和停止状态 */
         {
-            if (motor->dir == FORWARD)
-            {
-                motor->actPos++;
-            }
-            else
-            {
-                motor->actPos--;
-            }
             motorPosProtect(motor);
             motor->pos++; /* 当前位置加1 */
             motor->pulse = (uint16_t)(FREQ / motor->v1 / 2);
         }
         switch (motor->state) /* 根据当前状态进行判断 */
         {
-        case ACCEL:                           /* 加速状态 */
-            motor->ptr++;                     /* 指针加1 */
-            if (motor->pos >= motor->accStep) /* 如果大于加速段步数 */
+        case ACCEL:       /* 加速状态 */
+            motor->ptr++; /* 指针加1 */
+            if (motor->pos >= motor->accStep)
             {
-                myfree(motor->accTab); /* 释放内存 */
-                printf("free ACC %d\r\n", getMemoryUsage());
+                myfree(OUT, motor->accTab); /* 释放内存 */
+                printf("motor%d free ACC %d\r\n", motor->motor, getMemoryUsage(OUT));
                 motor->state = AVESPEED; /* 进入匀速状态 */
             }
             break;
-        case DECEL:                        /* 减速状态 */
-            motor->ptr++;                  /* 指针加1 */
-            if (motor->pos >= motor->step) /* 如果大于减速段步数 */
+        case DECEL:       /* 减速状态 */
+            motor->ptr++; /* 下一步 */
+            if (motor->pos >= motor->step)
             {
-                myfree(motor->decTab); /* 释放内存 */
-                printf("free DEC %d\r\n", getMemoryUsage());
+                myfree(OUT, motor->decTab); /* 释放内存 */
+                printf("motor%d free DEC %d\r\n", motor->motor, getMemoryUsage(OUT));
                 motor->state = STOP; /* 停止状态 */
             }
             break;
-        case AVESPEED:                            /* 匀速状态 */
-            if (motor->pos >= motor->changePoint) /* 如果大于改变点位置 */
+        case AVESPEED: /* 匀速状态 */
+            if (motor->pos >= motor->changePoint)
             {
                 motor->ptr = motor->decTab; /* 将减速段的速度表赋值给ptr */
                 motor->state = DECEL;       /* 进入减速状态 */

@@ -5,13 +5,30 @@
 #include "stdint.h"
 
 /* 内部SRAM */
-#define BlOCK_SIZE 32                   /* 内存块大小，必须为2的幂次方 */
-#define MAX_SIZE 40 * 1024              /* 最大内存 */
-#define BLOCK_NUM MAX_SIZE / BlOCK_SIZE /* 内存块个数 */
+#define SRAMIN_BLOCK_SIZE 32                                 /* 内存块大小，必须为2的幂次方 */
+#define SRAMIN_MAX_SIZE 40 * 1024                            /* 最大内存 */
+#define SRAMIN_BLOCK_NUM SRAMIN_MAX_SIZE / SRAMIN_BLOCK_SIZE /* 内存块个数 */
+
+/* 外部SRAM */
+#define SRAMOUT_BLOCK_SIZE 32
+#define SRAMOUT_MAX_SIZE 940 * 1024
+#define SRAMOUT_BLOCK_NUM SRAMOUT_MAX_SIZE / SRAMOUT_BLOCK_SIZE
+
+typedef enum
+{
+    IN = 0,
+    OUT = 1,
+} typeSRAM;
+
+typedef struct _SRAM
+{
+    uint8_t *pool[2];
+    uint16_t *map[2];
+} SRAM;
 
 void mallocInit(void);
-void *mymalloc(uint16_t size);
-void myfree(void *ptr);
-uint16_t getMemoryUsage(void);
+void *mymalloc(typeSRAM type, uint16_t size);
+void myfree(typeSRAM type, void *ptr);
+uint16_t getMemoryUsage(typeSRAM type);
 
 #endif /*__MALLOC_H__*/
