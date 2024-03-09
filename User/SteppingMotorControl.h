@@ -51,7 +51,7 @@ typedef enum
 /* 电机主要控制参数 */
 typedef struct _MotorControl
 {
-    int32_t v0;          /* 初速度 单位 step/s */
+    // int32_t v0;          /* 初速度 单位 step/s */
     int32_t v1;          /* 末速度 单位 step/s */
     int32_t accStep;     /* 加速段的步数单位 step */
     int32_t decStep;     /* 加速段的步数单位 step */

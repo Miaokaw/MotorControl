@@ -146,23 +146,30 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
         v0 = v1;
         v1 = tmp;
     }
-    motorControl->v0 = v0;
-    motorControl->v1 = v1;
+    // motorControl->v0 = v0;
+    // motorControl->v1 = v1;
+    // int32_t jerk = fabs((v1 - v0) / (t * t));                       /* 加速度 */
+    // int32_t jerkAccStep = (int32_t)(v0 * t + jerk * pow(t, 3) / 6); /* 加速度阶段的时间步 */
+    // int32_t jerkDecStep = (int32_t)((v1 + v0) * t - jerkAccStep);   /* 减速度阶段的时间步 */
 
-    float *perTab = NULL;                                           /* 存储每个时间步的值 */
-    int32_t jerk = fabs((v1 - v0) / (t * t));                       /* 加速度 */
-    int32_t jerkAccStep = (int32_t)(v0 * t + jerk * pow(t, 3) / 6); /* 加速度阶段的时间步 */
-    int32_t jerkDecStep = (int32_t)((v1 + v0) * t - jerkAccStep);   /* 减速度阶段的时间步 */
-    int32_t step = jerkAccStep + jerkDecStep;                       /* 总时间步数 */
+    float *perTab = NULL;                                  /* 存储每个时间步的值 */
+    int32_t jerk = fabs(v1 / (t * t));                     /* 加速度 */
+    int32_t jerkAccStep = (int32_t)(jerk * pow(t, 3) / 6); /* 加速度阶段的时间步 */
+    int32_t jerkDecStep = (int32_t)(v1 * t - jerkAccStep); /* 减速度阶段的时间步 */
+    int32_t step = jerkAccStep + jerkDecStep;              /* 总时间步数 */
+
     if (step % 2 != 0)
         step++;                                                    /* 如果步数为奇数，则加1(（int32_t）转换时出现的误差) */
     perTab = (float *)(mymalloc(OUT, (step + 1) * sizeof(float))); /* 分配内存空间 */
     if (perTab == NULL)
         return 1; // 内存分配失败，返回0
 
-    float ti = pow(6.0f / jerk, 1 / 3.0f);      /* 计算t1 */
-    float tSum = ti;                            /* 初始化tSum */
-    perTab[0] = v0 + 0.5f * jerk * powf(ti, 2); /* 计算第一个时间步的值 */
+    float ti = pow(6.0f / jerk, 1 / 3.0f); /* 计算t1 */
+    float tSum = ti;                       /* 初始化tSum */
+
+    perTab[0] = 0.5f * jerk * powf(ti, 2); /* 计算第一个时间步的值 */
+    // perTab[0] = v0 + 0.5f * jerk * powf(ti, 2); /* 计算第一个时间步的值 */
+
     if (perTab[0] < MIN_PWM)
         perTab[0] = MIN_PWM; /* 如果第一个时间步的值小于最小PWM值，则设置为最小PWM值 */
 
@@ -172,7 +179,9 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
         tSum += ti;                /* 更新tSum */
         if (i < jerkAccStep)
         {
-            perTab[i] = v0 + 0.5f * jerk * pow(tSum, 2); /* 计算加速度阶段的时间步的值 */
+            perTab[i] = 0.5f * jerk * powf(tSum, 2); /* 计算加速度阶段的时间步的值 */
+            // perTab[i] = v0 + 0.5f * jerk * pow(tSum, 2); /* 计算加速度阶段的时间步的值 */
+
             if (i == jerkAccStep - 1)
                 tSum = fabs(tSum - t); /* 如果是最后一个加速度阶段的时间步，则更新tSum为t的绝对值 */
             continue;
@@ -216,16 +225,18 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
  * @param step 步进数
  * @return uint8_t 返回操作结果，0表示成功，1表示内存不够，2表示步数不够
  */
- uint8_t motorMove(MotorControl *motor, int32_t v0, int32_t v1, float AccTime, float DecTime, int32_t step)
+uint8_t motorMove(MotorControl *motor, int32_t v1, float AccTime, float DecTime, int32_t step)
 {
     /* 加速表计算 */
-    if (perTabCal(motor, AccTime, v0, v1) == 1)
+    if (perTabCal(motor, AccTime, 0, v1) == 1)
         return 1;
     printf("motor%d malloc ACC %d\r\n", motor->motor, getMemoryUsage(OUT));
     /* 减速表计算 */
-    if (perTabCal(motor, DecTime, v1, v0) == 1)
+    if (perTabCal(motor, DecTime, v1, 0) == 1)
         return 1;
     printf("motor%d malloc DEC  %d\r\n", motor->motor, getMemoryUsage(OUT));
+
+    motor->v1 = v1;
 
     /* 控制电机的正反转 */
     if (step > 0)
