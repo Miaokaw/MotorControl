@@ -17,5 +17,8 @@ ServoData servoData = {0};
  */
 void ServoDataInit(ServoData *Data)
 {
-    memset(Data, 0, sizeof(ServoData)); /* 初始化 */
+    for (uint8_t i = 0; i < SERVO_RXBUFFER_LEN; i++)
+        Data->rxBuffer[i] = 0;
+    Data->rxFlag = 0;
+    Data->rxLen = 0;
 }

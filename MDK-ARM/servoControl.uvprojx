@@ -820,6 +820,16 @@
               <FileType>1</FileType>
               <FilePath>..\User\Key.c</FilePath>
             </File>
+            <File>
+              <FileName>Pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Pid.c</FilePath>
+            </File>
+            <File>
+              <FileName>Process.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Process.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

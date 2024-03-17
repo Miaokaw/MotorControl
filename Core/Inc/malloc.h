@@ -27,7 +27,7 @@ typedef struct _SRAM
 } SRAM;
 
 void mallocInit(void);
-void *mymalloc(typeSRAM type, uint16_t size);
+void *mymalloc(typeSRAM type, uint32_t size);
 void myfree(typeSRAM type, void *ptr);
 uint16_t getMemoryUsage(typeSRAM type);
 

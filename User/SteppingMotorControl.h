@@ -9,28 +9,45 @@
 
 #define MIN_PWM HCLK / ((PSC + 1) * (ARR + 1))
 
-#define MOTOR1DIRCHANGE(x)                                                                                             \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        x ? HAL_GPIO_WritePin(GPIOF, GPIO_PIN_7, GPIO_PIN_RESET) : HAL_GPIO_WritePin(GPIOF, GPIO_PIN_7, GPIO_PIN_SET); \
+#define ARM_LENTH 100
+
+#define MOTOR1_DIR_CHANGE(x)                                                                                                                                 \
+    do                                                                                                                                                       \
+    {                                                                                                                                                        \
+        x ? HAL_GPIO_WritePin(MOTOR1_DIR_GPIO_Port, MOTOR1_DIR_Pin, GPIO_PIN_RESET) : HAL_GPIO_WritePin(MOTOR1_DIR_GPIO_Port, MOTOR1_DIR_Pin, GPIO_PIN_SET); \
     } while (0)
-#define MOTOR2DIRCHANGE(x)                                                                                             \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        x ? HAL_GPIO_WritePin(GPIOF, GPIO_PIN_9, GPIO_PIN_RESET) : HAL_GPIO_WritePin(GPIOF, GPIO_PIN_9, GPIO_PIN_SET); \
+#define MOTOR2_DIR_CHANGE(x)                                                                                                                                 \
+    do                                                                                                                                                       \
+    {                                                                                                                                                        \
+        x ? HAL_GPIO_WritePin(MOTOR2_DIR_GPIO_Port, MOTOR2_DIR_Pin, GPIO_PIN_RESET) : HAL_GPIO_WritePin(MOTOR2_DIR_GPIO_Port, MOTOR2_DIR_Pin, GPIO_PIN_SET); \
     } while (0)
-#define MOTOR3DIRCHANGE(x) 1
-#define MOTOR4DIRCHANGE(x) 2
+#define MOTOR3_DIR_CHANGE(x) 1
+#define MOTOR4_DIR_CHANGE(x)                                                                                                                                 \
+    do                                                                                                                                                       \
+    {                                                                                                                                                        \
+        x ? HAL_GPIO_WritePin(MOTOR4_DIR_GPIO_Port, MOTOR4_DIR_Pin, GPIO_PIN_RESET) : HAL_GPIO_WritePin(MOTOR4_DIR_GPIO_Port, MOTOR4_DIR_Pin, GPIO_PIN_SET); \
+    } while (0)
 
 /* 电机状态 */
 typedef enum
 {
-    IDLE = 0,     /* 电机空闲状态 */
-    ACCEL = 1,    /* 电机加速状态 */
-    AVESPEED = 2, /* 电机匀速状态 */
-    DECEL = 3,    /* 电机减速状态 */
-    STOP = 4,     /* 电机停止状态 */
-} State;
+    IDLE = 0,        /* 电机空闲状态 */
+    ACCEL = 1,       /* 电机加速状态 */
+    AVESPEED = 2,    /* 电机匀速状态 */
+    DECEL = 3,       /* 电机减速状态 */
+    STOP = 4,        /* 电机停止状态 */
+//    FINE_ADJUST = 5, /* 电机微调状态 */
+} MotorState;
+
+typedef enum
+{
+    CLOSE = 0,
+    OPEN = 1,
+    TRIANGLE = 3,
+    SQUARE = 4,
+    CIRCLE = 5,
+    TRAPEZOID = 6,
+} ClawState;
 
 /* 电机编号 */
 typedef enum
@@ -51,7 +68,6 @@ typedef enum
 /* 电机主要控制参数 */
 typedef struct _MotorControl
 {
-    // int32_t v0;          /* 初速度 单位 step/s */
     int32_t v1;          /* 末速度 单位 step/s */
     int32_t accStep;     /* 加速段的步数单位 step */
     int32_t decStep;     /* 加速段的步数单位 step */
@@ -62,12 +78,12 @@ typedef struct _MotorControl
     int32_t step;        /* 总步数 */
     int32_t pos;         /* 加减速中位置 */
     int32_t actPos;      /* 实际位置 */
-    int32_t maxPos;      /* 最大限制位置 */
     uint16_t pulse;      /* pulse */
     uint8_t i;           /* 两次中断输出一次脉冲 */
-    State state;         /* 电机状态 */
+    MotorState state;    /* 电机状态 */
     MOTOR motor;         /* 电机编号 */
     DIR dir;             /* 电机方向 */
+    PIDControl pid;
 } MotorControl;
 
 extern MotorControl motor1;
@@ -78,6 +94,10 @@ extern MotorControl motor4;
 extern uint8_t errorBeep;
 
 void motorInit(void);
-uint8_t motorMove(MotorControl *motorControl, int32_t v0, int32_t v1, float AccTime, float DecTime, int32_t step);
+void motorSpeedControlStar(MotorControl *motor, uint16_t pluse);
+void motorSpeedControlStop(MotorControl *motor);
+void motorMove2Pos(MotorControl *motor, int32_t v1, float accTime, float decTime, int32_t pos);
+uint8_t clawStateChange(ClawState state);
+uint8_t motorMove(MotorControl *motorControl, int32_t v1, float AccTime, float DecTime, int32_t step);
 
 #endif /*__STEPPINGMOTORCONTROL_H__*/

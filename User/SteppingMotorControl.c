@@ -14,6 +14,8 @@ MotorControl motor2 = {0};
 MotorControl motor3 = {0};
 MotorControl motor4 = {0};
 
+ClawState clawState = CLOSE;
+
 /**
  * @brief 初始化函数
  *
@@ -24,10 +26,6 @@ void motorInit(void)
     motor2.motor = MOTOR2;
     motor3.motor = MOTOR3;
     motor4.motor = MOTOR4;
-    motor1.maxPos = 10000; /* 细分系数 = 8 爪子 = 10000， 较短丝杆 = ？， 较长丝杆 = ？ */
-    motor2.maxPos = 10000;
-    motor3.maxPos = 10000;
-    motor4.maxPos = 10000;
 }
 /**
  * @brief 步进电机定时器参数更新
@@ -50,6 +48,12 @@ void motorTIMUpgrade(MotorControl *motor)
         tmp = 0xFFFF & (timCount + motor->pulse);
         __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, tmp);
         break;
+    case MOTOR3:
+        break;
+    case MOTOR4:
+        timCount = __HAL_TIM_GET_COUNTER(&htim2);
+        tmp = 0xFFFF & (timCount + motor->pulse);
+        __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, tmp);
     default:
         break;
     }
@@ -77,6 +81,15 @@ void motorTIMStar(MotorControl *motor)
         /* 启动计时器的输出比较器 */
         HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
         break;
+    case MOTOR3:
+        break;
+    case MOTOR4:
+        /* 重置计数器和比较器的值 */
+        __HAL_TIM_SET_COUNTER(&htim2, 0);
+        __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, (uint16_t)motor->pulse / 2);
+        /* 启动计时器的输出比较器 */
+        HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_1);
+        break;
     default:
         break;
     }
@@ -96,6 +109,11 @@ void motorTIMStop(MotorControl *motor)
     case MOTOR2:
         HAL_TIM_OC_Stop_IT(&htim1, TIM_CHANNEL_1);
         break;
+    case MOTOR3:
+        break;
+    case MOTOR4:
+        HAL_TIM_OC_Stop_IT(&htim2, TIM_CHANNEL_1);
+        break;
     default:
         break;
     }
@@ -111,10 +129,17 @@ void motorDirChange(MotorControl *motor)
     switch (motor->motor)
     {
     case MOTOR1:
-        MOTOR1DIRCHANGE(motor->dir);
+        MOTOR1_DIR_CHANGE(motor->dir);
         break;
     case MOTOR2:
-        MOTOR2DIRCHANGE(motor->dir);
+        MOTOR2_DIR_CHANGE(motor->dir);
+        break;
+    case MOTOR3:
+        break;
+    case MOTOR4:
+        MOTOR4_DIR_CHANGE(motor->dir);
+        break;
+    default:
         break;
     }
 }
@@ -139,24 +164,20 @@ void motorDirChange(MotorControl *motor)
 uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
 {
     uint8_t flag = 0;
-    if (v0 > v1)
+    if (v0)
     {
         flag = 1;
-        int32_t tmp = v0;
-        v0 = v1;
-        v1 = tmp;
+        v1 = v0;
     }
-    // motorControl->v0 = v0;
-    // motorControl->v1 = v1;
+    motorControl->v1 = v1;
     // int32_t jerk = fabs((v1 - v0) / (t * t));                       /* 加速度 */
     // int32_t jerkAccStep = (int32_t)(v0 * t + jerk * pow(t, 3) / 6); /* 加速度阶段的时间步 */
     // int32_t jerkDecStep = (int32_t)((v1 + v0) * t - jerkAccStep);   /* 减速度阶段的时间步 */
-
-    float *perTab = NULL;                                  /* 存储每个时间步的值 */
-    int32_t jerk = fabs(v1 / (t * t));                     /* 加速度 */
-    int32_t jerkAccStep = (int32_t)(jerk * pow(t, 3) / 6); /* 加速度阶段的时间步 */
-    int32_t jerkDecStep = (int32_t)(v1 * t - jerkAccStep); /* 减速度阶段的时间步 */
-    int32_t step = jerkAccStep + jerkDecStep;              /* 总时间步数 */
+    float *perTab = NULL;                                         /* 存储每个时间步的值 */
+    int32_t jerk = fabs(4.0f * v1 / (t * t));                     /* 加速度 */
+    int32_t jerkAccStep = (int32_t)(jerk * pow(t, 3) / 48.0f);    /* 加速度阶段的时间步 */
+    int32_t jerkDecStep = (int32_t)(v1 * t / 2.0f - jerkAccStep); /* 减速度阶段的时间步 */
+    int32_t step = jerkAccStep + jerkDecStep;                     /* 总时间步数 */
 
     if (step % 2 != 0)
         step++;                                                    /* 如果步数为奇数，则加1(（int32_t）转换时出现的误差) */
@@ -167,7 +188,7 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
     float ti = pow(6.0f / jerk, 1 / 3.0f); /* 计算t1 */
     float tSum = ti;                       /* 初始化tSum */
 
-    perTab[0] = 0.5f * jerk * powf(ti, 2); /* 计算第一个时间步的值 */
+    perTab[0] = jerk * pow(ti, 2) / 2.0f; /* 计算第一个时间步的值 */
     // perTab[0] = v0 + 0.5f * jerk * powf(ti, 2); /* 计算第一个时间步的值 */
 
     if (perTab[0] < MIN_PWM)
@@ -183,11 +204,11 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
             // perTab[i] = v0 + 0.5f * jerk * pow(tSum, 2); /* 计算加速度阶段的时间步的值 */
 
             if (i == jerkAccStep - 1)
-                tSum = fabs(tSum - t); /* 如果是最后一个加速度阶段的时间步，则更新tSum为t的绝对值 */
+                tSum = fabs(tSum - t / 2.0f); /* 如果是最后一个加速度阶段的时间步，则更新tSum为t的绝对值 */
             continue;
         }
-        perTab[i] = v1 - 0.5f * jerk * pow(fabs(t - tSum), 2); /* 计算减速度阶段的时间步的值 */
-        if (perTab[i] > v1)
+        perTab[i] = v1 - 0.5f * jerk * pow(fabs(t / 2.0f - tSum), 2); /* 计算减速度阶段的时间步的值 */
+        if (perTab[i] >= v1)
         {
             step = i; /* 如果时间步的值大于终止速度，则结束循环 */
             break;
@@ -214,6 +235,32 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
     return 0; /* 计算成功，返回0 */
 }
 
+uint8_t clawStateChange(ClawState state)
+{
+//    if (clawState == state)
+        //return 1;
+    switch (state)
+    {
+    case OPEN:
+        motorMove2Pos(&motor4, 6400, 0.5, 0.5, 10000);
+        break;
+    case CLOSE:
+        motorMove2Pos(&motor4, 4800, 0.5, 0.5, 0);
+        break;
+    case SQUARE:
+        motorMove2Pos(&motor4, 4800, 0.5, 0.5, 2000);
+        break;
+    case CIRCLE:
+        motorMove2Pos(&motor4, 6400, 0.5, 0.5, 1500);
+    break;
+    default:
+        break;
+    }
+    clawState = state;
+    return 0;
+}
+
+
 /**
  * @brief 控制电机移动
  *
@@ -225,18 +272,16 @@ uint8_t perTabCal(MotorControl *motorControl, float t, int32_t v0, int32_t v1)
  * @param step 步进数
  * @return uint8_t 返回操作结果，0表示成功，1表示内存不够，2表示步数不够
  */
-uint8_t motorMove(MotorControl *motor, int32_t v1, float AccTime, float DecTime, int32_t step)
+uint8_t motorMove(MotorControl *motor, int32_t v1, float accTime, float decTime, int32_t step)
 {
     /* 加速表计算 */
-    if (perTabCal(motor, AccTime, 0, v1) == 1)
+    if (perTabCal(motor, accTime, 0, v1) == 1)
         return 1;
     printf("motor%d malloc ACC %d\r\n", motor->motor, getMemoryUsage(OUT));
     /* 减速表计算 */
-    if (perTabCal(motor, DecTime, v1, 0) == 1)
+    if (perTabCal(motor, decTime, v1, 0) == 1)
         return 1;
-    printf("motor%d malloc DEC  %d\r\n", motor->motor, getMemoryUsage(OUT));
-
-    motor->v1 = v1;
+    printf("motor%d malloc DEC %d\r\n", motor->motor, getMemoryUsage(OUT));
 
     /* 控制电机的正反转 */
     if (step > 0)
@@ -253,6 +298,7 @@ uint8_t motorMove(MotorControl *motor, int32_t v1, float AccTime, float DecTime,
     {
         myfree(OUT, motor->accTab);
         myfree(OUT, motor->decTab);
+        printf("Step too Low! %d", getMemoryUsage(OUT));
         return 2;
     }
 
@@ -272,6 +318,16 @@ uint8_t motorMove(MotorControl *motor, int32_t v1, float AccTime, float DecTime,
     return 0;
 }
 
+void motorMove2Pos(MotorControl *motor, int32_t v1, float accTime, float decTime, int32_t pos)
+{
+    int32_t step = pos - motor->actPos;
+   uint8_t err = motorMove(motor, v1, accTime, decTime, step);
+    float time = fabsf((float)step / v1 - 0.01f);
+    if (err == 2)
+    {
+        motorMove(motor, v1, time, time, step);
+    }
+}
 /**
  * @brief 步进电机超限保护
  *
@@ -283,23 +339,21 @@ void motorPosProtect(MotorControl *motor)
         motor->actPos++;
     else
         motor->actPos--;
-    if (motor->actPos >= 0 && motor->actPos <= motor->maxPos)
-        return;
-    if (motor->actPos < 0)
-    {
-        motor->actPos = 0;
-        motor->state = STOP;
-        motorTIMStop(motor);
-    }
-    else if (motor->actPos > motor->maxPos)
-    {
-        motor->actPos = motor->maxPos;
-        motor->state = STOP;
-        motorTIMStop(motor);
-    }
-    errorBeep = 1;
-    myfree(OUT, motor->accTab);
-    myfree(OUT, motor->decTab);
+//    if (motor->actPos >= 0 && motor->actPos <= motor->maxPos)
+//        return;
+//    if (motor->actPos < 0)
+//    {
+//        motor->actPos = 0;
+//        motor->state = STOP;
+//    }
+//    else if (motor->actPos > motor->maxPos)
+//    {
+//        motor->actPos = motor->maxPos;
+//        motor->state = STOP;
+//    }
+//    errorBeep = 1;
+//    myfree(OUT, motor->accTab);
+//    myfree(OUT, motor->decTab);
 }
 
 /**
@@ -319,29 +373,29 @@ void motorStateUpgrade(MotorControl *motor)
         {
             motorPosProtect(motor);
             motor->pos++; /* 当前位置加1 */
-            motor->pulse = (uint16_t)(FREQ / motor->v1 / 2);
         }
         switch (motor->state) /* 根据当前状态进行判断 */
         {
-        case ACCEL:       /* 加速状态 */
+        case ACCEL: /* 加速状态 */
+            motor->pulse = (uint16_t)(FREQ / *motor->ptr / 2);
             motor->ptr++; /* 指针加1 */
             if (motor->pos >= motor->accStep)
             {
                 myfree(OUT, motor->accTab); /* 释放内存 */
-                printf("motor%d free ACC %d\r\n", motor->motor, getMemoryUsage(OUT));
-                motor->state = AVESPEED; /* 进入匀速状态 */
+                motor->state = AVESPEED;    /* 进入匀速状态 */
             }
             break;
-        case DECEL:       /* 减速状态 */
+        case DECEL: /* 减速状态 */
+            motor->pulse = (uint16_t)(FREQ / *motor->ptr / 2);
             motor->ptr++; /* 下一步 */
             if (motor->pos >= motor->step)
             {
                 myfree(OUT, motor->decTab); /* 释放内存 */
-                printf("motor%d free DEC %d\r\n", motor->motor, getMemoryUsage(OUT));
-                motor->state = STOP; /* 停止状态 */
+                motor->state = STOP;        /* 停止状态 */
             }
             break;
         case AVESPEED: /* 匀速状态 */
+            motor->pulse = (uint16_t)(FREQ / motor->v1 / 2);
             if (motor->pos >= motor->changePoint)
             {
                 motor->ptr = motor->decTab; /* 将减速段的速度表赋值给ptr */
@@ -350,9 +404,23 @@ void motorStateUpgrade(MotorControl *motor)
             break;
         case STOP:               /* 停止状态 */
             motorTIMStop(motor); /* 停止对应PWM通道 */
+            printf("motor%d free %d\r\n", motor->motor, getMemoryUsage(OUT));
             motor->state = IDLE; /* 空闲状态 */
             break;
         case IDLE: /* 空闲状态 */
+            break;
+        // case FINE_ADJUST:
+        //     if (motor->pid.output < 0)
+        //     {
+        //         motor->pid.output = -motor->pid.output;
+        //         motor->dir = BACKWARD;
+        //     }
+        //     else
+        //         motor->dir = FORWARD;
+        //     motorDirChange(motor);
+        //     motor->pulse = (uint16_t)(FREQ / motor->pid.output / 2);
+        //     break;
+        default:
             break;
         }
     }
@@ -374,5 +442,13 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
     else if (htim->Instance == TIM1) /* 判断定时器是否为TIM1 */
     {
         motorStateUpgrade(&motor2);
+    }
+    else if (htim->Instance == TIM3)
+    {
+        motorStateUpgrade(&motor3);
+    }
+    else if (htim->Instance == TIM2)
+    {
+        motorStateUpgrade(&motor4);
     }
 }

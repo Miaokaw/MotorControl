@@ -9,9 +9,9 @@
 
 #define UART_TIMEOUT 0xFFFF
 
+Servo servo[4] = {0};
+
 uint8_t servoTxBuf[SERVO_NUM * 3 + 7];
-int16_t batteryVolt;
-Servo servo[SERVO_NUM];
 /**
  * @brief 舵机位置初始化
  * @fn 1500即为中间位置
@@ -21,33 +21,57 @@ void servoInit(void)
     ServoDataInit(&servoData);
     for (uint8_t i = 0; i < SERVO_NUM; i++)
     {
-        servo[i].servoID = i;        /* 下标即为编号 */
-        servo[i].targetAngel = 1500; /* 90度 */
+        servo[i].servoID = i;  /* 下标即为编号 */
+        servo[i].Angel = 1500; /* 90度 */
     }
+    servoAction(ARM, 1200, 5000);
+    servoAction(SPIN, 580, 5000);
+    servoAction(CLAW, 1320, 5000);
 }
 
+void servoAction(Tools tool, uint16_t targetAngel, uint16_t runTime)
+{
+
+    switch (tool)
+    {
+        case ARM:
+            runServoAction(0, targetAngel, runTime);
+            runServoAction(1, 3000 - targetAngel, runTime);
+            break;
+        case SPIN:
+            runServoAction(2, targetAngel, runTime);
+            break;
+        case CLAW:
+            runServoAction(3, targetAngel, runTime);
+            break;
+
+    }
+}
 /**
- * @brief 控制任意个舵机的转动
+ * @brief 控制单个舵机的转动
  * @retval 无
  */
-void runServosAction(void)
+void runServoAction(uint8_t servoNum, uint16_t targetAngel, uint16_t time)
 {
-    uint8_t index = SERVO_NUM - 1;
     servoTxBuf[0] = servoTxBuf[1] = FRAME_HEAD;
-    servoTxBuf[2] = SERVO_NUM * 3 + 5;
+    servoTxBuf[2] = 8;
     servoTxBuf[3] = CMD_SERVO_MOVE;
-    servoTxBuf[4] = SERVO_NUM;
-    servoTxBuf[5] = GET_LOW_BYTE(DT);
-    servoTxBuf[6] = GET_HIGH_BYTE(DT);
+    servoTxBuf[4] = 1;
+    servoTxBuf[5] = GET_LOW_BYTE(time);
+    servoTxBuf[6] = GET_HIGH_BYTE(time);
+    servoTxBuf[7] = servoNum;
+    servoTxBuf[8] = GET_LOW_BYTE(targetAngel);
+    servoTxBuf[9] = GET_HIGH_BYTE(targetAngel);
+    HAL_UART_Transmit(&huart1, servoTxBuf, 10, UART_TIMEOUT);
+    servo[servoNum].Angel = targetAngel;
+}
 
-    for (uint8_t i = 7; i < SERVO_NUM * 3 + 7; i += 3)
+void runServosAction(uint8_t num, uint8_t *servos, uint16_t *targetAngel, uint16_t *time)
+{
+    for (uint8_t i = 0; i < num; i++)
     {
-        servoTxBuf[i] = servo[index].servoID;
-        servoTxBuf[i + 1] = GET_LOW_BYTE(servo[index].targetAngel);
-        servoTxBuf[i + 2] = GET_HIGH_BYTE(servo[index].targetAngel);
-        index--;
+        runServoAction(servos[i], targetAngel[i], time[i]);
     }
-    HAL_UART_Transmit(&huart1, servoTxBuf, SERVO_NUM * 3 + 7, UART_TIMEOUT);
 }
 
 /**

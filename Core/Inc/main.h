@@ -31,12 +31,14 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "../../User/Pid.h"
 #include "../../User/ServoControl.h"
 #include "../../User/SteppingMotorControl.h"
 #include "../../User/Key.h"
 #include "../../User/Beep.h"
 #include "../../User/Led.h"
 #include "../../User/DMASerial.h"
+#include "../../User/Process.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -74,8 +76,30 @@ void Error_Handler(void);
 #define LED1_GPIO_Port GPIOE
 #define KEY3_Pin GPIO_PIN_6
 #define KEY3_GPIO_Port GPIOE
+#define MOTOR1_EN_Pin GPIO_PIN_6
+#define MOTOR1_EN_GPIO_Port GPIOF
+#define MOTOR1_DIR_Pin GPIO_PIN_7
+#define MOTOR1_DIR_GPIO_Port GPIOF
+#define MOTOR2_EN_Pin GPIO_PIN_8
+#define MOTOR2_EN_GPIO_Port GPIOF
+#define MOTOR2_DIR_Pin GPIO_PIN_9
+#define MOTOR2_DIR_GPIO_Port GPIOF
 #define KEY_UP_Pin GPIO_PIN_0
 #define KEY_UP_GPIO_Port GPIOA
+#define MOTOR4_EN_Pin GPIO_PIN_1
+#define MOTOR4_EN_GPIO_Port GPIOB
+#define MOTOR1_TIM_Pin GPIO_PIN_6
+#define MOTOR1_TIM_GPIO_Port GPIOC
+#define MOTOR2_TIM_Pin GPIO_PIN_8
+#define MOTOR2_TIM_GPIO_Port GPIOA
+#define SERVO_TX_Pin GPIO_PIN_9
+#define SERVO_TX_GPIO_Port GPIOA
+#define SERVO_RX_Pin GPIO_PIN_10
+#define SERVO_RX_GPIO_Port GPIOA
+#define MOTOR4_TIM_Pin GPIO_PIN_15
+#define MOTOR4_TIM_GPIO_Port GPIOA
+#define MOTOR4_DIR_Pin GPIO_PIN_3
+#define MOTOR4_DIR_GPIO_Port GPIOB
 #define LED0_Pin GPIO_PIN_5
 #define LED0_GPIO_Port GPIOB
 #define BEEP_Pin GPIO_PIN_8
@@ -85,6 +109,12 @@ void Error_Handler(void);
 #define HCLK 72000000
 #define FREQ 4000000
 #define NULL 0
+#define WAIT(flag)  \
+    while (!(flag)) \
+    {               \
+    }
+
+#define waitS(motor) WAIT(motor.state == IDLE)
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

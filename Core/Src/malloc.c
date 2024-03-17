@@ -1,7 +1,7 @@
 #include "malloc.h"
 
 static __align(32) uint8_t sramInPool[SRAMIN_MAX_SIZE]; /* 内存池 */
-uint16_t sramInMap[SRAMIN_BLOCK_NUM];            /* 内存管理表 */
+uint16_t sramInMap[SRAMIN_BLOCK_NUM];                   /* 内存管理表 */
 
 static __align(32) uint8_t sramOutPool[SRAMOUT_MAX_SIZE] __attribute__((at(0X68000000)));
 uint16_t sramOutMap[SRAMOUT_BLOCK_NUM] __attribute__((at(0X68000000 + SRAMOUT_MAX_SIZE)));
@@ -33,7 +33,9 @@ void mymemset(void *ptr, uint8_t c, uint32_t len)
 void mallocInit(void)
 {
     mymemset(sram.map[IN], 0, BLOCK_NUM[IN] * 2);
+    mymemset(sram.pool[IN], 0, MAX_SIZE[IN]);
     mymemset(sram.map[OUT], 0, BLOCK_NUM[OUT] * 2);
+    mymemset(sram.pool[OUT], 0, MAX_SIZE[OUT]);
 }
 
 /**
@@ -41,7 +43,7 @@ void mallocInit(void)
  * @param size 内存空间的大小
  * @return void* 分配的内存空间的指针，如果分配失败则返回NULL
  */
-void *mymalloc(typeSRAM type, uint16_t size)
+void *mymalloc(typeSRAM type, uint32_t size)
 {
     long offset = 0;                               /* 记录待分配的内存块的偏移量 */
     uint32_t freeBlocks = 0;                       /* 记录可用的连续内存块的数量 */

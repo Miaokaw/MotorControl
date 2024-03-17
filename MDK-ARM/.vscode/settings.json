@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "steppingmotorcontrol.h": "c",
+        "malloc.h": "c"
+    }
+}

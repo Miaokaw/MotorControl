@@ -3,17 +3,17 @@
         {
             "name": "servoControl",
             "includePath": [
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\Core\\Inc",
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\Drivers\\STM32F1xx_HAL_Driver\\Inc",
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\Drivers\\STM32F1xx_HAL_Driver\\Inc\\Legacy",
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\Drivers\\CMSIS\\Device\\ST\\STM32F1xx\\Include",
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\Drivers\\CMSIS\\Include",
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\Core\\Inc",
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\Drivers\\STM32F1xx_HAL_Driver\\Inc",
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\Drivers\\STM32F1xx_HAL_Driver\\Inc\\Legacy",
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\Drivers\\CMSIS\\Device\\ST\\STM32F1xx\\Include",
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\Drivers\\CMSIS\\Include",
                 "D:\\software\\MDK5\\ARM\\ARMCC\\include",
                 "D:\\software\\MDK5\\ARM\\ARMCC\\include\\rw",
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\MDK-ARM",
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\Core\\Src",
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\Drivers\\STM32F1xx_HAL_Driver\\Src",
-                "c:\\Users\\Miao_kaw\\Desktop\\motorControl\\User"
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\MDK-ARM",
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\Core\\Src",
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\Drivers\\STM32F1xx_HAL_Driver\\Src",
+                "c:\\Users\\Miao_kaw\\Desktop\\motorControl(奇迹行者)\\User"
             ],
             "defines": [
                 "USE_HAL_DRIVER",

@@ -49,6 +49,7 @@
 /* USER CODE BEGIN PV */
 uint8_t key = 0;
 uint8_t err = 0;
+uint8_t i = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -96,10 +97,13 @@ int main(void)
   MX_TIM6_Init();
   MX_TIM1_Init();
   MX_FSMC_Init();
+  MX_TIM2_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   servoInit();
   mallocInit();
   motorInit();
+  ledLed(RED, 3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -109,45 +113,43 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    /* 测试用代�? */
+    /* 测试用代�?? */
     key = key_scan(0);
     if (key)
     {
       switch (key)
       {
       case KEY_UP_PRES:
-        printf("keyup\r\n");
-
-        ledLed(RED, 1);
+          resetProcess();
         break;
       case KEY0_PRES:
-        printf("key0\r\n");
-        ledLed(GREEN, 1);
+          clawStateChange(CLOSE);
         break;
       case KEY1_PRES:
-        printf("key1\r\n");
-        motor1.state = STOP;
-        motor2.state = STOP;
-        myfree(OUT, motor1.accTab);
-        myfree(OUT, motor1.decTab);
-        myfree(OUT, motor2.accTab);
-        myfree(OUT, motor2.decTab);
-        printf("free STOP %d\r\n", getMemoryUsage(OUT));
+          motorMove(&motor4, 1600, 0.1, 0.1, 500);
+          WAIT(motor4.state == IDLE);
+
         break;
       case KEY2_PRES:
-
-        printf("key2\r\n");
+          motorMove(&motor4, 1600, 0.1, 0.1, -500);
+          WAIT(motor4.state == IDLE);
         break;
       case KEY3_PRES:
-        printf("key3\r\n");
+            testProcess();
         break;
       }
     }
     else
     {
+      i++;
       HAL_Delay(10);
+      if (i == 50)
+      {
+        i = 0;
+        LED1_TOGGLE();
+      }
     }
-    /* 测试用代码 */
+    /* 测试用代�?? */
   }
   /* USER CODE END 3 */
 }
